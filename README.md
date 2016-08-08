@@ -202,122 +202,53 @@ Beautifully simple, right? But then I discovered various flaws:
   with `[]`, `()`, or `{}`.  I quickly ran out of usable syntax!
   (notice that `<>` are not on this list, and with good reason!)
 
-And before I knew it, I had a mini-lanugage.
+And before I knew it, in order to be able to fit the bare minimum
+set of features necessary to make it even marginally useful,
+it ended up with its own mini-lanugage.
 
 ### Can you explain it?
 
-Okey dokey.
+Okey dokey:
 
-## `unwrap!` mini-language
+## [`unbox!` mini-language](https://github.com/ExpHP/unbox-macro/blob/master/doc/Grammar.md)?
 
-Here's a simple example, showing the bits that most-closely
-resemble function syntax.
+(go click that)
 
-	unbox!{ pub Fn AddAB(a:i32, b:i32) -> i32 { a + b } }
+## Known limitations/bugs
 
-The visibility qualifier is optional and supports `pub(restricted)`.
+* Only one closure definition per macro invocation.
+* Unhelpful error messages.
+* Did you hear it has its own mini-language?
+* The arguments can only be simple identifiers and not patterns.
+  (there was an RFC with the grammar change necessary to make this possible,
+  but that particular bit got cut) <!-- FIXME: link -->
 
-`Fn` is the most specialized trait in the `Fn` heirarchy we want to
-implement; impls will be derived for its supertraits, `FnMut` and
-`FnOnce`. (similarly, `FnOnce` would be derived if we wrote `FnMut`).
+    unbox!{ Fn Naughty((a,b): (i32,i32)) -> i32 { a + b } }
+    unbox!{ Fn Nice(tuple: (i32,i32)) -> i32 { tuple.0 + tuple.1 } }
 
-There are a number of optional fields; the above is equivalent to this
-**expanded form**:
+* If the closure struct type has any non-lifetime type parameters,
+  the arguments cannot have lifetimes.  **Fixing this will require
+  another revision to the spec.** <!-- FIXME: make issue -->
 
-    unbox!{
-        pub Generic({}) Struct For({}) Fn AddAB(&self, a:i32, b:i32) -> i32 { a + b }
-    }
-
-Here you see that all unboxed functions can have an **explicit self**,
-but you can omit it as long as you don't need to refer to `self` inside the closure
-(in which case the `self` arg would be needed to properly resolve hygiene).
-To help avoid confusion in the function implementation,
-the `self` pattern must be consistent with the `Fn` trait:
-
- |   Trait  | `self` arg |
- | -------- | -----------|
- | `FnOnce` |   `self`   |
- | `FnMut`  |`&mut self` |
- | `Fn`     |  `&self`   |
-
-Returning to the above, you will note three special "keywords" `Generic`, `Struct`,
-and `For`. Note that **these three terms must always be specified in this order**.
-Who are these three stooges, exactly? Let's tackle them in order of decreasing
-importance:
-
-**Struct** lets you specify the fields of the struct (i.e. the variables it is to
-be closed over):
-
- * `Struct` is unit-like.
- * `Struct(A,B,...,Z)` is a tuple struct.
- * `Struct{a:A, b:B, ..., z:Z}` is a... um, struct struct.
-
-**Generic** lets you specify type parameters and bounds for the struct.
-The type parameters go inside the curly braces, optionally followed by where bounds:
-
-                                 creates
-    Generic({T}) Struct(T,T)     ======>   struct Name<T>(T,T);
-    
-    Generic({'a,T} where T:'a)   creates
-        Struct(&'a T)            ======>   struct Name<'a,T>(&'a T) where T:'a;
-    
-    Generic({'a,T,U,V} where     creates
-     T:Add<U,Output=V> + Copy,   ======>   <exactly what you think>
-     U:Hash) Struct(whatever)
-
-The reason for the name is because it makes your Struct a *Generic Struct*.
-
-**For** lets you specify bounds *on the impl*.  The difference may seem subtle
-at first, but you must be aware of it; these are parameters which describe
-the *arguments to the function* (while the parameters in `Generic` describe its
-closed-over environment).
-
-Consider the difference between a function which always produces a single value,
-versus a function which always returns its argument (no matter the type):
-
-	// always produces same value
-	unbox!{ Generic({T}) Struct(T) FnOnce Const(self) -> T { self.0 } }
-	// always returns argument
-	unbox!{ For({T}) Fn Id(x:T) -> T { x } }
-
-All bounds on the struct are also automatically included on the impl.
-In general, `For` should only need to contain bounds which involve at least
-one of the type parameters newly introduced inside the `For`.
-
-The reason for the name is as a parallel to HRTB syntax `for<'a>`,
-as some of the bounds it lets you introduce are of a similar nature.
-
-Here's something it *would* let you do, if it wasn't **terribly,
-horribly broken right now:**
-
-	unbox!{
-		Generic({'a,T} where T:'a, T:PartialEq)
-		  Struct(&'a Vec<T>)
-		For({'b} where T:'b)
-		Fn Contains(&self, x: &'b T) -> bool { self.0.contains(x) }
-	}
-
-Which brings us to the next section.
-
-## Why is it so terrible!?
+### Why is it so terrible!?
 
 MACROS ARE HARD GUYS
 
 Let's face it.  Rust's current macro system is pretty gosh darned weak,
 and basically seems to be something to hold people over until the
 fabled "macros v2".
-This macro is perhaps too ambitious for Rust's macro parser, and is
-perhaps better suited to ~a plugin~--er, I mean procedural macro.
+This macro is perhaps too ambitious for Rust's macro parser,
+and may be better suited to ~a plugin~ I mean procedural macro.
 
 Half of what this macro does now was not even possible two weeks prior
 to me writing this; it was only at the end of July 2016 that [a fix had
-finally been committed for the funny business with `tt` tokens](https://github.com/rust-lang/rust/pull/34908).
+finally been committed for the funny business with `tt` fragments](https://github.com/rust-lang/rust/pull/34908).
 Prior to that fix, I could not have even *dreamed* of supporting trait
 bounds (as it would have entailed actually *parsing* them!).
 
 ### Have you seen https://xkcd.com/1205/ ?
 
-yes, go away
+go away
 
 ### I could do so much better!
 
@@ -331,20 +262,32 @@ YES I'M SORRY OKAY
 Comparison to alternatives
 --------------------------
 
+### What about the accepted `impl Trait` RFC?  Soon, we won't need nameable types!
+
+In its accepted form,
+[the minimal `impl Trait` RFC](https://github.com/rust-lang/rfcs/pull/1522)
+doesn't let you do this:
+
+    // Somewhere, in the City of Townsville...
+    let zipped = zip_with(0..3, 0..4, |x,y| {x+y});
+    assert_eq!(zipped.rev().len(), 3);
+    
+    // Meanwhile, in the Town of Citysburg...
+    let zipped = zip_with(0.., 7.., |x,y| {x+y});
+    assert_eq!(zipped.next(), Some(7));
+
+because it has no provision for
+forwarding conditionally-implemented traits
+such as the `DoubleEndedIterator` and `ExactSizeIterator` traits
+seen on many iterator adaptors.
+With `unbox_macro`, the above snippet works
+because `zip_with`'s return type can be
+explicitly defined in terms of `Zip` and `Map`.
+
 ### What about `Box<Iterator>` or `&Iterator`?
 
 Yes, what about them?
 
-### ...uh... okay, what about the accepted `impl Trait` RFC?  Soon, we won't need nameable types!
+---------------------------------------------------------------
 
-In its current form, the [`impl Trait` RFC](https://github.com/rust-lang/rfcs/pull/1522) doesn't let you do this:
-
-    let x = my_cool_object.iter();
-    println!("{}", x.rev().len());
-
-because it provides no provision for forwarding the `DoubleEndedIterator` and
-`ExactSizeIterator` traits.
-
-The end
--------
     09:34:24 <toby_s>   macro_rules! over_you_all { }
