@@ -1,4 +1,6 @@
-# `unwrap!` mini-language
+# `unbox!` mini-language
+
+## Overview
 
 Here's a simple example, showing the bits that most-closely
 resemble function syntax.
@@ -12,8 +14,7 @@ and supports `pub(restricted)`.
 
 By replacing `Fn` you can select which **Fn trait** is implemented.
 Because `Fn` is the most specialized trait in the `Fn` heirarchy,
-impls will be derived for its supertraits, `FnMut` and `FnOnce`.
-(similarly, `FnOnce` would be derived if we wrote `FnMut`).
+`AddAB` will also receive derived impls for the supertraits `FnMut` and `FnOnce`.
 
 There are a number of optional fields; the above is equivalent to this
 **expanded form**:
@@ -38,7 +39,7 @@ the `self` pattern is required to be consistent with the `Fn` trait:
 
 Returning to the example above,
 you will note three special "keywords" `Generic`, `Struct`, and `For`.
-Note that **these three terms must always be specified in this order**.
+Note that, while all are optional, **these three terms must always be specified in this order**.
 Who are these three stooges, exactly?
 Let's tackle them in order of decreasing importance:
 
@@ -81,10 +82,10 @@ Consider, for example,
 the difference between a function which always produces a single value,
 versus a function which always returns its argument (no matter the type):
 
-	// always produces same value
-	unbox!{ Generic({T}) Struct(T) FnOnce Const(self) -> T { self.0 } }
-	// always returns argument
-	unbox!{ For({T}) Fn Id(x:T) -> T { x } }
+    // always produces same value
+    unbox!{ Generic({T}) Struct(T) FnOnce Const(self) -> T { self.0 } }
+    // always returns argument
+    unbox!{ For({T}) Fn Id(x:T) -> T { x } }
 
 All bounds on the struct are also automatically included on the impl.
 In general, `For` should only need to contain bounds which involve at least
@@ -98,11 +99,13 @@ as some of the bounds it lets you introduce are of a similar nature.
 Here's something it *would* let you do, if it wasn't **terribly,
 horribly broken right now:**
 
-	unbox!{
-		Generic({'a,T} where T:'a, T:PartialEq)
-		  Struct(&'a Vec<T>)
-		For({'b} where T:'b)
-		Fn Contains(&self, x: &'b T) -> bool { self.0.contains(x) }
-	}
 
-I do not believe I can fix this without changing the spec again
+    unbox!{
+        Generic({'a,T} where T:'a, T:PartialEq)
+          Struct(&'a Vec<T>)
+        For({'b} where T:'b)
+        Fn Contains(&self, x: &'b T) -> bool { self.0.contains(x) }
+    }
+
+I do not believe this can be fixed this without changing the spec to
+somehow separate lifetime parameters from non-lifetime parameters.
