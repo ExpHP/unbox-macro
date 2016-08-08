@@ -8,6 +8,7 @@ which are nameable in the type system.
     * [Is unbox_macro right for me?](#is-unbox_macro-right-for-me)
     * [Sounds great! What is it for?](#sounds-great-what-is-it-for)
     * [unbox! mini-language](#unbox-mini-language)
+    * [Examples?](#examples)
     * [Known limitations/bugs](#known-limitationsbugs)
     * [Why is it so terrible!?](#why-is-it-so-terrible)
     * [Comparison to alternatives](#comparison-to-alternatives)
@@ -226,6 +227,10 @@ Okey dokey:
 ## [`unbox!` mini-language](https://github.com/ExpHP/unbox-macro/blob/master/doc/Grammar.md)
 
 (go click that)
+
+## Examples?
+
+[Compile tests?](https://github.com/ExpHP/unbox-macro/blob/master/src/lib.rs#L339)
 
 ## Known limitations/bugs
 
