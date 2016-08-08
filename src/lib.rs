@@ -40,55 +40,49 @@ macro_rules! __parse {
 
 	// Parse visibility modifier
 	(a0 [pub($($vis:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a3 [$($r)*]$($d)* [pub($($vis)*)] }};
+		{__parse!{b0 [$($r)*]$($d)* [pub($($vis)*)] }};
 
 	(a0 [pub              $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a3 [$($r)*]$($d)* [pub          ] }};
+		{__parse!{b0 [$($r)*]$($d)* [pub          ] }};
 
 	(a0 [                 $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a3 [$($r)*]$($d)* [             ] }};
+		{__parse!{b0 [$($r)*]$($d)* [             ] }};
 
 	// Parse struct type parameters
-	(a3 [Generic({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a5 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
+	(b0 [Generic({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
+		{__parse!{b5 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
-	(a3 [Generic({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a5 [$($r)*]$($d)* [$($par)*][        ] }};
+	(b0 [Generic({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
+		{__parse!{b5 [$($r)*]$($d)* [$($par)*][        ] }};
 
-	(a3 [                                         $($r:tt)*]$($d:tt)*) =>
-		{__parse!{a5 [$($r)*]$($d)* [        ][        ] }};
+	(b0 [                                         $($r:tt)*]$($d:tt)*) =>
+		{__parse!{b5 [$($r)*]$($d)* [        ][        ] }};
 
 	// Read field list
 	// NOTE: don't blindly rearrange; must always ensure first mismatch is a nonterminal
-	(a5 [Struct(           ) $($r:tt)*]$($d:tt)*) => {__parse!{a7 [$($r)*]$($d)*[ unitlike ]}};
-	(a5 [Struct($($fld:tt)+) $($r:tt)*]$($d:tt)*) => {__parse!{a7 [$($r)*]$($d)*[[$($fld)+]]}};
-	(a5 [Struct{$($fld:tt)*} $($r:tt)*]$($d:tt)*) => {__parse!{a7 [$($r)*]$($d)*[{$($fld)*}]}};
-	(a5 [Struct              $($r:tt)*]$($d:tt)*) => {__parse!{a7 [$($r)*]$($d)*[ unitlike ]}};
-	(a5 [                    $($r:tt)*]$($d:tt)*) => {__parse!{a7 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [Struct(           ) $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [Struct($($fld:tt)+) $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[[$($fld)+]]}};
+	(b5 [Struct{$($fld:tt)*} $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[{$($fld)*}]}};
+	(b5 [Struct              $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [                    $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
 
 	// Parse impl type parameters
-	(a7 [For({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
+	(c0 [For({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
+		{__parse!{d0 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
-	(a7 [For({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [$($par)*][        ] }};
+	(c0 [For({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
+		{__parse!{d0 [$($r)*]$($d)* [$($par)*][        ] }};
 
-	(a7 [                                     $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [        ][        ] }};
+	(c0 [                                     $($r:tt)*]$($d:tt)*) =>
+		{__parse!{d0 [$($r)*]$($d)* [        ][        ] }};
 
 	// Validate Fn trait
-	(b0 [FnOnce $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[FnOnce]}};
-	(b0 [FnMut  $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[FnMut ]}};
-	(b0 [Fn     $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[Fn    ]}};
-
-	// FIXME <DELETED>
-	(c0 $($d:tt)*) => {__parse!{d0 $($d)*}};
+	(d0 [FnOnce $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[FnOnce]}};
+	(d0 [FnMut  $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[FnMut ]}};
+	(d0 [Fn     $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[Fn    ]}};
 
 	// Read struct name
-	(d0 [$name:ident $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[$name]}};
-
-	// FIXME <DELETED>
-	(e0 $($d:tt)*) => {__parse!{f0 $($d)*}};
+	(e0 [$name:ident $($r:tt)*]$($d:tt)*) => {__parse!{f0 [$($r)*]$($d)*[$name]}};
 
 	//======================
 	// Parsing the args:  A whole ball game in itself.
@@ -130,7 +124,6 @@ macro_rules! __parse {
 	(f2 { $($arg:tt)*}$($d:tt)*) => {__parse!{f3 {$($arg)*}$($d)*}};
 
 	// Generate a pattern (a,b,c,) and a type (A,B,C,) for the arg tuple.
-	// FIXME: Haven't tested whether the yes/no terminating comma cases work (I doubt they do)
 	// NOTE: `:` is not in the follow set for `pat` so we must settle for simple `ident` args
 	(f3 {}                          $($d:tt)*) => {__parse!{f4 $($d)*[()][()]}};
 	(f3 {$($arg:ident : $Arg:ty),+ }$($d:tt)*) => {__parse!{f4 $($d)*[($($arg,)+)][($($Arg,)+)]}};
@@ -387,7 +380,8 @@ mod compiletests {
 	}
 
 	// Where-less for no bounds.
-	unbox!{ For({T}) Fn Id(x:T) -> T { x } }
+	// A terminal comma.
+	unbox!{ For({T}) Fn Id(x:T,) -> T { x } }
 	unbox!{ Generic({T}) Struct(T) FnOnce Const(self) -> T { self.0 } }
 
 	// Now make me one with everything.
