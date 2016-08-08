@@ -8,6 +8,7 @@ which are nameable in the type system.
     * [Is unbox_macro right for me?](#is-unbox_macro-right-for-me)
     * [Sounds great! What is it for?](#sounds-great-what-is-it-for)
     * [unbox! mini-language](#unbox-mini-language)
+    * [Known limitations/bugs](#known-limitationsbugs)
     * [Why is it so terrible!?](#why-is-it-so-terrible)
     * [Comparison to alternatives](#comparison-to-alternatives)
 
@@ -244,7 +245,7 @@ unbox!{ Fn Nice(tuple: (i32,i32)) -> i32 { tuple.0 + tuple.1 } }
   the arguments cannot have lifetimes.  **Fixing this will require
   another revision to the spec.**
 
-### Why is it so terrible!?
+## Why is it so terrible!?
 
 MACROS ARE HARD GUYS
 
