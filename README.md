@@ -7,10 +7,9 @@ which are nameable in the type system.
   * [unbox-macro](#unbox-macro)
     * [Is unbox_macro right for me?](#is-unbox_macro-right-for-me)
     * [Sounds great! What is it for?](#sounds-great-what-is-it-for)
-    * [unwrap! mini-language](#unwrap-mini-language)
+    * [unbox! mini-language](#unbox-mini-language)
     * [Why is it so terrible!?](#why-is-it-so-terrible)
     * [Comparison to alternatives](#comparison-to-alternatives)
-    * [The end](#the-end)
 
 
 Is `unbox_macro` right for me?
@@ -35,20 +34,24 @@ In today's Rust, sometimes, small abstractions can take a lot of code.
 For instance, suppose you have written a iterator adaptor function that
 requires the use of `Iterator::map`.  Something like:
 
-    pub fn zip_with<I,J,F,A,B,C>(iter: I, jitter: J, func: F)
-     -> ZipWith<I,J,F>
-     where I: IntoIterator<Item=A>,
-           J: IntoIterator<Item=B>,
-           F: FnMut(A,B) -> C,
-    {
-        iter.into_iter().zip(jitter.into_iter()).map(|(a,b)| func(a,b))
-    }
+```rust
+pub fn zip_with<I,J,F,A,B,C>(iter: I, jitter: J, func: F)
+ -> ZipWith<I,J,F>
+ where I: IntoIterator<Item=A>,
+       J: IntoIterator<Item=B>,
+       F: FnMut(A,B) -> C,
+{
+    iter.into_iter().zip(jitter.into_iter()).map(|(a,b)| func(a,b))
+}
+```
 
 Okey dokey.  So what's the return type of that?
 
-    pub use std::iter::{Zip,Map};
-    
-    pub type ZipWith<I,J,F> = Map<Zip<I,J>,F>; // :D
+```rust
+pub use std::iter::{Zip,Map};
+
+pub type ZipWith<I,J,F> = Map<Zip<I,J>,F>; // :D
+```
 
 Yeah!  Er... not quite.
 
@@ -65,126 +68,135 @@ a closure that takes a 2-value tuple and calls a two-argument function.
 This is extremely unfortunate for us,
 because, as one might imagine, `[closure@<anon>:7:54: 7:68]` is not exactly
 a valid name in rust.
-It is impossible to express the type of this function in any manner!
+
+Long and short: **It is impossible to express the return type of this function in any manner!**
 
 Possible solution number 1 is to **write a lot of code:**
 
-    use std::iter::Zip;
+```rust
+use std::iter::Zip;
 
-    #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
-    #[derive(Debug,Clone)]
-    struct ZipWith<I,J,F>{ iter: Zip<I,J>, func: F }
+#[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
+#[derive(Debug,Clone)]
+struct ZipWith<I,J,F>{ iter: Zip<I,J>, func: F }
 
-    impl<I,J,F,C> Iterator for ZipWith<I,J,F>
-     where I: Iterator, J: Iterator,
-           F: FnMut(I::Item, J::Item) -> C,
-    {
-        type Item = C;
+impl<I,J,F,C> Iterator for ZipWith<I,J,F>
+ where I: Iterator, J: Iterator,
+       F: FnMut(I::Item, J::Item) -> C,
+{
+    type Item = C;
 
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
-            self.iter.next().map(|(a,b)| (&mut self.func)(a,b))
-        }
-        #[inline(always)]
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            self.iter.size_hint()
-        }
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(a,b)| (&mut self.func)(a,b))
     }
-
-    impl<I,J,F,C> ExactSizeIterator for ZipWith<I,J,F>
-     where I: ExactSizeIterator,
-           J: ExactSizeIterator,
-           F: FnMut(I::Item,J::Item) -> C,
-    { }
-
-    impl<I,J,F,C> DoubleEndedIterator for ZipWith<I,J,F>
-     where I: DoubleEndedIterator + ExactSizeIterator,
-           J: DoubleEndedIterator + ExactSizeIterator,
-           F: FnMut(I::Item,J::Item) -> C,
-    {
-        #[inline(always)]
-        fn next_back(&mut self) -> Option<Self::Item> {
-            self.iter.next().map(|(a,b)| (&mut self.func)(a,b))
-        }
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
+}
 
-    pub fn zip_with<I,J,F,C>(iter: I, jtre: J, func: F) -> ZipWith<I,J,F>
-     where I: Iterator, J: Iterator,
-           F: FnMut(I::Item, J::Item) -> C,
-    { ZipWith { iter: iter.zip(jtre), func: func } }
+impl<I,J,F,C> ExactSizeIterator for ZipWith<I,J,F>
+ where I: ExactSizeIterator,
+       J: ExactSizeIterator,
+       F: FnMut(I::Item,J::Item) -> C,
+{ }
+
+impl<I,J,F,C> DoubleEndedIterator for ZipWith<I,J,F>
+ where I: DoubleEndedIterator + ExactSizeIterator,
+       J: DoubleEndedIterator + ExactSizeIterator,
+       F: FnMut(I::Item,J::Item) -> C,
+{
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(a,b)| (&mut self.func)(a,b))
+    }
+}
+
+pub fn zip_with<I,J,F,C>(iter: I, jtre: J, func: F) -> ZipWith<I,J,F>
+ where I: Iterator, J: Iterator,
+       F: FnMut(I::Item, J::Item) -> C,
+{ ZipWith { iter: iter.zip(jtre), func: func } }
+```
 
 (psssst... I hid a bug in there.  Can you find it?)
 
 Possible solution number 2 is to **enable a bunch of nightly features,
 and then write a lot of code:**
 
-    #![feature(unboxed_closures)]
-    #![feature(fn_traits)]
-    #![feature(non_ascii_idents)]
+```rust
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
+#![feature(non_ascii_idents)]
 
-    use std::iter::{Zip,Map};
+use std::iter::{Zip,Map};
 
-    /// Hmm, this name made a lot more sense in Haskell...
-    pub struct Uncurry<F>{ func: F }
-    pub type ZipWith<I,J,F> = Map<Zip<I,J>, Uncurry<F>>;
+/// Hmm, this name made a lot more sense in Haskell...
+pub struct Uncurry<F>{ func: F }
+pub type ZipWith<I,J,F> = Map<Zip<I,J>, Uncurry<F>>;
 
-    impl<F,A,B,C> FnOnce<((A,B),)> for Uncurry<F>
-     where F: FnMut(A,B) -> C,
-    {
-        type Output = C;
+impl<F,A,B,C> FnOnce<((A,B),)> for Uncurry<F>
+ where F: FnMut(A,B) -> C,
+{
+    type Output = C;
 
-        extern "rust-call"
-        fn call_once(mut self, args: ((A,B),)) -> C
-        { self.call_mut(args) }
-    }
+    extern "rust-call"
+    fn call_once(mut self, args: ((A,B),)) -> C
+    { self.call_mut(args) }
+}
 
-    impl<F,A,B,C> FnMut<((A,B),)> for Uncurry<F>
-     where F: FnMut(A,B) -> C,
-    {
-        extern "rust-call"
-        fn call_mut(&mut self, ((a,b),): ((A,B),)) -> C
-        { (&mut self.func)(a,b) }
-    }
+impl<F,A,B,C> FnMut<((A,B),)> for Uncurry<F>
+ where F: FnMut(A,B) -> C,
+{
+    extern "rust-call"
+    fn call_mut(&mut self, ((a,b),): ((A,B),)) -> C
+    { (&mut self.func)(a,b) }
+}
 
-    pub fn zip_with<I,J,F,C>(iter: I, ジーター: J, func: F)
-     -> ZipWith<I,J,F>
-     where I: Iterator, J: Iterator,
-           F: FnMut(I::Item, J::Item) -> C,
-    { iter.zip(ジーター).map(Uncurry{func: func}) }
+pub fn zip_with<I,J,F,C>(iter: I, ジーター: J, func: F)
+ -> ZipWith<I,J,F>
+ where I: Iterator, J: Iterator,
+       F: FnMut(I::Item, J::Item) -> C,
+{ iter.zip(ジーター).map(Uncurry{func: func}) }
+```
 
 This crate provides you with a third option: **enable a bunch of
 nightly features, import a crate which contains a lot of code,
 and then write a smaller(?) amount of code:**
 
-    #![feature(unboxed_closures)]
-    #![feature(fn_traits)]
-    #[macro_use]
-    extern crate unbox_macro;
+```rust
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
+#[macro_use]
+extern crate unbox_macro;
 
-    use std::iter::{Map,Zip};
+use std::iter::{Map,Zip};
 
-    pub type ZipWith<I,J,F> = Map<Zip<I,J>, Uncurry<F>>;
-    unbox!{
-        pub Generic({F}) Struct(F)
-        For({A,B,C} where F: FnMut(A,B) -> C)
-        FnMut Uncurry(&mut self, tuple: (A,B)) -> C {
-            (&mut self.0)(tuple.0, tuple.1)
-        }
+pub type ZipWith<I,J,F> = Map<Zip<I,J>, Uncurry<F>>;
+unbox!{
+    pub Generic({F}) Struct(F)
+    For({A,B,C} where F: FnMut(A,B) -> C)
+    FnMut Uncurry(&mut self, tuple: (A,B)) -> C {
+        (&mut self.0)(tuple.0, tuple.1)
     }
+}
 
-    pub fn zip_with<I,J,F,C>(iter: I, jydr: J, func: F)
-     -> ZipWith<I,J,F>
-     where I: Iterator, J: Iterator,
-           F: FnMut(I::Item, J::Item) -> C,
-    { iter.zip(jydr).map(Uncurry(func)) }
-
+pub fn zip_with<I,J,F,C>(iter: I, jydr: J, func: F)
+ -> ZipWith<I,J,F>
+ where I: Iterator, J: Iterator,
+       F: FnMut(I::Item, J::Item) -> C,
+{ iter.zip(jydr).map(Uncurry(func)) }
+```
+    
 ### Woah woah woah, what's up with this `Generic` and `Struct`... this has its own mini-language I have to learn!?
 
 Yes. The original plan was really simple:
 
-    // I won't show any examples of my original plan because somebody
-    // quickly scanning the page for examples might see them and think
-    // they are real examples.
+```rust
+// I won't show any examples of my original plan because somebody
+// quickly scanning the page for examples might see them and think
+// they are real examples.
+```
 
 Beautifully simple, right? But then I discovered various flaws:
 
@@ -210,7 +222,7 @@ it ended up with its own mini-lanugage.
 
 Okey dokey:
 
-## [`unbox!` mini-language](https://github.com/ExpHP/unbox-macro/blob/master/doc/Grammar.md)?
+## [`unbox!` mini-language](https://github.com/ExpHP/unbox-macro/blob/master/doc/Grammar.md)
 
 (go click that)
 
@@ -221,14 +233,16 @@ Okey dokey:
 * Did you hear it has its own mini-language?
 * The arguments can only be simple identifiers and not patterns.
   (there was an RFC with the grammar change necessary to make this possible,
-  but that particular bit got cut) <!-- FIXME: link -->
+  [but that particular bit got cut](https://github.com/rust-lang/rfcs/pull/1494#issuecomment-181740601))
 
-    unbox!{ Fn Naughty((a,b): (i32,i32)) -> i32 { a + b } }
-    unbox!{ Fn Nice(tuple: (i32,i32)) -> i32 { tuple.0 + tuple.1 } }
+```rust
+unbox!{ Fn Naughty((a,b): (i32,i32)) -> i32 { a + b } }
+unbox!{ Fn Nice(tuple: (i32,i32)) -> i32 { tuple.0 + tuple.1 } }
+```
 
 * If the closure struct type has any non-lifetime type parameters,
   the arguments cannot have lifetimes.  **Fixing this will require
-  another revision to the spec.** <!-- FIXME: make issue -->
+  another revision to the spec.**
 
 ### Why is it so terrible!?
 
@@ -238,7 +252,7 @@ Let's face it.  Rust's current macro system is pretty gosh darned weak,
 and basically seems to be something to hold people over until the
 fabled "macros v2".
 This macro is perhaps too ambitious for Rust's macro parser,
-and may be better suited to ~a plugin~ I mean procedural macro.
+and may be better suited to ~~a plugin~~ I mean procedural macro.
 
 Half of what this macro does now was not even possible two weeks prior
 to me writing this; it was only at the end of July 2016 that [a fix had
@@ -268,13 +282,15 @@ In its accepted form,
 [the minimal `impl Trait` RFC](https://github.com/rust-lang/rfcs/pull/1522)
 doesn't let you do this:
 
-    // Somewhere, in the City of Townsville...
-    let zipped = zip_with(0..3, 0..4, |x,y| {x+y});
-    assert_eq!(zipped.rev().len(), 3);
-    
-    // Meanwhile, in the Town of Citysburg...
-    let zipped = zip_with(0.., 7.., |x,y| {x+y});
-    assert_eq!(zipped.next(), Some(7));
+```rust
+// Somewhere, in the City of Townsville...
+let zipped = zip_with(0..3, 0..4, |x,y| {x+y});
+assert_eq!(zipped.rev().len(), 3);
+
+// Meanwhile, in the Town of Citysburg...
+let zipped = zip_with(0.., 7.., |x,y| {x+y});
+assert_eq!(zipped.next(), Some(7));
+```
 
 because it has no provision for
 forwarding conditionally-implemented traits
