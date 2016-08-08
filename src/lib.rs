@@ -16,11 +16,11 @@
 
 #[macro_export]
 macro_rules! unbox {
-	($($r:tt)*) => {__parse!{a0 [$($r)*]}};
+	($($r:tt)*) => {__unbox_parse!{a0 [$($r)*]}};
 }
 
 #[macro_export]
-macro_rules! __parse {
+macro_rules! __unbox_parse {
 	// The layout of the arguments is as follows: (square brackets are literal)
 	//
 	//    <label> [<unparsed remainder>] [<parsed #1>][<parsed #2>]...
@@ -41,49 +41,49 @@ macro_rules! __parse {
 
 	// Parse visibility modifier
 	(a0 [pub($($vis:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [pub($($vis)*)] }};
+		{__unbox_parse!{b0 [$($r)*]$($d)* [pub($($vis)*)] }};
 
 	(a0 [pub              $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [pub          ] }};
+		{__unbox_parse!{b0 [$($r)*]$($d)* [pub          ] }};
 
 	(a0 [                 $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b0 [$($r)*]$($d)* [             ] }};
+		{__unbox_parse!{b0 [$($r)*]$($d)* [             ] }};
 
 	// Parse struct type parameters
 	(b0 [Generic({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b5 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
+		{__unbox_parse!{b5 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
 	(b0 [Generic({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b5 [$($r)*]$($d)* [$($par)*][        ] }};
+		{__unbox_parse!{b5 [$($r)*]$($d)* [$($par)*][        ] }};
 
 	(b0 [                                         $($r:tt)*]$($d:tt)*) =>
-		{__parse!{b5 [$($r)*]$($d)* [        ][        ] }};
+		{__unbox_parse!{b5 [$($r)*]$($d)* [        ][        ] }};
 
 	// Read field list
 	// NOTE: don't blindly rearrange; must always ensure first mismatch is a nonterminal
-	(b5 [Struct(           ) $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
-	(b5 [Struct($($fld:tt)+) $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[[$($fld)+]]}};
-	(b5 [Struct{$($fld:tt)*} $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[{$($fld)*}]}};
-	(b5 [Struct              $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
-	(b5 [                    $($r:tt)*]$($d:tt)*) => {__parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [Struct(           ) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [Struct($($fld:tt)+) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[[$($fld)+]]}};
+	(b5 [Struct{$($fld:tt)*} $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[{$($fld)*}]}};
+	(b5 [Struct              $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
+	(b5 [                    $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
 
 	// Parse impl type parameters
 	(c0 [For({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{d0 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
+		{__unbox_parse!{d0 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
 	(c0 [For({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
-		{__parse!{d0 [$($r)*]$($d)* [$($par)*][        ] }};
+		{__unbox_parse!{d0 [$($r)*]$($d)* [$($par)*][        ] }};
 
 	(c0 [                                     $($r:tt)*]$($d:tt)*) =>
-		{__parse!{d0 [$($r)*]$($d)* [        ][        ] }};
+		{__unbox_parse!{d0 [$($r)*]$($d)* [        ][        ] }};
 
 	// Validate Fn trait
-	(d0 [FnOnce $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[FnOnce]}};
-	(d0 [FnMut  $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[FnMut ]}};
-	(d0 [Fn     $($r:tt)*]$($d:tt)*) => {__parse!{e0 [$($r)*]$($d)*[Fn    ]}};
+	(d0 [FnOnce $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[FnOnce]}};
+	(d0 [FnMut  $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[FnMut ]}};
+	(d0 [Fn     $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[Fn    ]}};
 
 	// Read struct name
-	(e0 [$name:ident $($r:tt)*]$($d:tt)*) => {__parse!{f0 [$($r)*]$($d)*[$name]}};
+	(e0 [$name:ident $($r:tt)*]$($d:tt)*) => {__unbox_parse!{f0 [$($r)*]$($d)*[$name]}};
 
 	//======================
 	// Parsing the args:  A whole ball game in itself.
@@ -99,55 +99,55 @@ macro_rules! __parse {
 	//    - The `self` identifier, with correct hygiene.
 
 	// First, duplicate the arglist in a temporary workspace.
-	(f0 [($($arg:tt)*) $($r:tt)*]$($d:tt)*) => {__parse!{f1 {($($arg)*)($($arg)*)}[$($r)*]$($d)*}};
-	(f0 [($($arg:tt)*) $($r:tt)*]$($d:tt)*) => {__parse!{f1 {($($arg)*)($($arg)*)}[$($r)*]$($d)*}};
+	(f0 [($($arg:tt)*) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{f1 {($($arg)*)($($arg)*)}[$($r)*]$($d)*}};
+	(f0 [($($arg:tt)*) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{f1 {($($arg)*)($($arg)*)}[$($r)*]$($d)*}};
 
 	// Match against terminals in one copy to determine how to extract the
 	//  `self` ident in the second copy. (for the time being, the unparsed
 	//  remainder [$($r)*] has been tucked away into $d)
 	(f1 {(&mut self $($xxx:tt)*) (&mut $slf:ident $($arg:tt)*)}$($d:tt)*) =>
-		{__parse!{f2 {$($arg)*}$($d)*[&mut self][$slf]}};
+		{__unbox_parse!{f2 {$($arg)*}$($d)*[&mut self][$slf]}};
 
 	(f1 {(&self     $($xxx:tt)*) (&$slf:ident     $($arg:tt)*)}$($d:tt)*) =>
-		{__parse!{f2 {$($arg)*}$($d)*[&self    ][$slf]}};
+		{__unbox_parse!{f2 {$($arg)*}$($d)*[&self    ][$slf]}};
 
 	(f1 {(self      $($xxx:tt)*) ($slf:ident      $($arg:tt)*)}$($d:tt)*) =>
-		{__parse!{f2 {$($arg)*}$($d)*[self     ][$slf]}};
+		{__unbox_parse!{f2 {$($arg)*}$($d)*[self     ][$slf]}};
 
 	(f1 {(          $($xxx:tt)*) (                $($arg:tt)*)}$($d:tt)*) =>
-		{__parse!{f2 {$($arg)*}$($d)*[wildcard][self]}};
+		{__unbox_parse!{f2 {$($arg)*}$($d)*[wildcard][self]}};
 
 	// The comma after self was not parsed in the previous step because it
 	//  would require mantaining yet another three additional cases.
 	// Stripping it now is much easier; though as a result, there is an expected,
 	// minor bug that an initial comma with no self is accepted. (e.g. `(, x: i32)`)
-	(f2 {,$($arg:tt)*}$($d:tt)*) => {__parse!{f3 {$($arg)*}$($d)*}};
-	(f2 { $($arg:tt)*}$($d:tt)*) => {__parse!{f3 {$($arg)*}$($d)*}};
+	(f2 {,$($arg:tt)*}$($d:tt)*) => {__unbox_parse!{f3 {$($arg)*}$($d)*}};
+	(f2 { $($arg:tt)*}$($d:tt)*) => {__unbox_parse!{f3 {$($arg)*}$($d)*}};
 
 	// Generate a pattern (a,b,c,) and a type (A,B,C,) for the arg tuple.
 	// NOTE: `:` is not in the follow set for `pat` so we must settle for simple `ident` args
-	(f3 {}                          $($d:tt)*) => {__parse!{f4 $($d)*[()][()]}};
-	(f3 {$($arg:ident : $Arg:ty),+ }$($d:tt)*) => {__parse!{f4 $($d)*[($($arg,)+)][($($Arg,)+)]}};
-	(f3 {$($arg:ident : $Arg:ty),+,}$($d:tt)*) => {__parse!{f4 $($d)*[($($arg,)+)][($($Arg,)+)]}};
+	(f3 {}                          $($d:tt)*) => {__unbox_parse!{f4 $($d)*[()][()]}};
+	(f3 {$($arg:ident : $Arg:ty),+ }$($d:tt)*) => {__unbox_parse!{f4 $($d)*[($($arg,)+)][($($Arg,)+)]}};
+	(f3 {$($arg:ident : $Arg:ty),+,}$($d:tt)*) => {__unbox_parse!{f4 $($d)*[($($arg,)+)][($($Arg,)+)]}};
 
 	// Done with the args (whew!). Moving on, then...
-	(f4 $($d:tt)*) => {__parse!{g0 $($d)*}};
+	(f4 $($d:tt)*) => {__unbox_parse!{g0 $($d)*}};
 
 	//======================
 
 	// return type and code block, in one step because tt cannot follow ty
-	(g0 [-> $out:ty $code:block]$($d:tt)*) => {__parse!{j0 []$($d)* [$out][$code] }};
-	(g0 [           $code:block]$($d:tt)*) => {__parse!{j0 []$($d)* [ () ][$code] }};
+	(g0 [-> $out:ty $code:block]$($d:tt)*) => {__unbox_parse!{j0 []$($d)* [$out][$code] }};
+	(g0 [           $code:block]$($d:tt)*) => {__unbox_parse!{j0 []$($d)* [ () ][$code] }};
 
 	// done parsing
-	(j0 [] $($d:tt)*) => {__build!{[] $($d)*}};
+	(j0 [] $($d:tt)*) => {__unbox_build!{[] $($d)*}};
 }
 
 #[macro_export]
-macro_rules! __build {
+macro_rules! __unbox_build {
 	// Expect a bunch of preparsed content delimited by square brackets
 	// (the initial empty list serves as a label)
-	([] $([$($all:tt)*])*) => {__build!{a0 $([$($all)*])*}};
+	([] $([$($all:tt)*])*) => {__unbox_build!{a0 $([$($all)*])*}};
 
 	// NOTE: This is the most fragile point in the code!
 	//       (in part because its sole purpose is to make the rest of the
@@ -171,7 +171,7 @@ macro_rules! __build {
 	 $code:tt // code block
 	) => {
 		// ...and create groups for them based on how they are to be used.
-		__build!{b0
+		__unbox_build!{b0
 			// groups that require post-processing
 			[$Fn $slfpat]
 			[$spar $ipar]
@@ -184,10 +184,10 @@ macro_rules! __build {
 
 	// Validate the sigil on self against the Fn trait.
 	//  (this was too difficult to do inside the __parse macro)
-	(b0 [[FnOnce]      [self]] $($r:tt)*) => {__build!{c0 $($r)*}};
-	(b0 [[FnMut]  [&mut self]] $($r:tt)*) => {__build!{c0 $($r)*}};
-	(b0 [[Fn]         [&self]] $($r:tt)*) => {__build!{c0 $($r)*}};
-	(b0 [$Fn:tt    [wildcard]] $($r:tt)*) => {__build!{c0 $($r)*}};
+	(b0 [[FnOnce]      [self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
+	(b0 [[FnMut]  [&mut self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
+	(b0 [[Fn]         [&self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
+	(b0 [$Fn:tt    [wildcard]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	// FIXME The error message for a bad `self` arg points to "b0", making
 	//       this restriction significantly less helpful than I intended...
 
@@ -196,35 +196,35 @@ macro_rules! __build {
 	//   - the full parameter list
 	// we build the latter through a painful match.
 	(c0 [[] []]             $($r:tt)*) =>
-		{__build!{c1 $($r)* [] [] }};
+		{__unbox_build!{c1 $($r)* [] [] }};
 
 	(c0 [[] [$($ipar:tt)+]] $($r:tt)*) =>
-		{__build!{c1 $($r)* [] [$($ipar)+] }};
+		{__unbox_build!{c1 $($r)* [] [$($ipar)+] }};
 
 	(c0 [[$($spar:tt)+] []] $($r:tt)*) =>
-		{__build!{c1 $($r)* [$($spar)+] [$($spar)+] }};
+		{__unbox_build!{c1 $($r)* [$($spar)+] [$($spar)+] }};
 
 	(c0 [[$($spar:tt)+] [$($ipar:tt)+]] $($r:tt)*) =>
-		{__build!{c1 $($r)* [$($spar)+] [$($spar)+ , $($ipar)+] }};
+		{__unbox_build!{c1 $($r)* [$($spar)+] [$($spar)+ , $($ipar)+] }};
 
 	// push two more things:
 	//    - struct bounds
 	//    - full bounds
 	// We also take care of the `where` here, because an empty `where` clause is invalid.
 	(c1 [[] []]             $($r:tt)*) =>
-		{__build!{c2 $($r)* [] [] }};
+		{__unbox_build!{c2 $($r)* [] [] }};
 
 	(c1 [[] [$($ibnd:tt)+]] $($r:tt)*) =>
-		{__build!{c2 $($r)* [] [where $($ibnd)+] }};
+		{__unbox_build!{c2 $($r)* [] [where $($ibnd)+] }};
 
 	(c1 [[$($sbnd:tt)+] []] $($r:tt)*) =>
-		{__build!{c2 $($r)* [where $($sbnd)+] [where $($sbnd)+] }};
+		{__unbox_build!{c2 $($r)* [where $($sbnd)+] [where $($sbnd)+] }};
 
 	(c1 [[$($sbnd:tt)+] [$($ibnd:tt)+]] $($r:tt)*) =>
-		{__build!{c2 $($r)* [where $($sbnd)+] [where $($sbnd)+ , $($ibnd)+] }};
+		{__unbox_build!{c2 $($r)* [where $($sbnd)+] [where $($sbnd)+ , $($ibnd)+] }};
 
 	// Done pre-processing
-	(c2 $($d:tt)*) => {__build!{d0 $($d)*}};
+	(c2 $($d:tt)*) => {__unbox_build!{d0 $($d)*}};
 
 	// |============
 	// | REST AREA =
@@ -240,14 +240,14 @@ macro_rules! __build {
 		//   $sfrags = [$fld $vis $name]
 		//   $ifrags = [$Fn $name $slf $pat $Args $out $code]
 		// ...assuming that I remembered to update this comment.
-		__build_struct!{$sfrags [$spar $swhr]}
-		__build_impls! {$ifrags [$spar $fpar $fwhr]}
+		__unbox_build_struct!{$sfrags [$spar $swhr]}
+		__unbox_build_impls! {$ifrags [$spar $fpar $fwhr]}
 	};
 }
 
 // This defines the struct.
 #[macro_export]
-macro_rules! __build_struct {
+macro_rules! __unbox_build_struct {
 	// switch based on $fld
 	([[unitlike        ] [$($vis:tt)*] [$name:ident]]
 	 [[$($par:tt)*] [$($whr:tt)*]]) => {
@@ -266,25 +266,25 @@ macro_rules! __build_struct {
 
 // This generates the Fn{Mut,Once,} impls.
 #[macro_export]
-macro_rules! __build_impls {
+macro_rules! __unbox_build_impls {
 	([[$Fn:ident] $name:tt $slf:tt $pat:tt $Args:tt $out:tt $code:tt]
 	 [$spar:tt $fpar:tt $fwhr:tt]) => {
-		__build_impls!{All $Fn
+		__unbox_build_impls!{All $Fn
 			[$name $spar $fpar $slf $pat $Args $out $fwhr $code] // args for primary impls
 			[$name $spar $fpar           $Args $out $fwhr      ] // args for derived impls
 		}
 	};
 	(All FnOnce $pfrags:tt $dfrags:tt) => {
-		__build_impls!{Primary FnOnce $pfrags}
+		__unbox_build_impls!{Primary FnOnce $pfrags}
 	};
 	(All FnMut $pfrags:tt $dfrags:tt) => {
-		__build_impls!{Derived FnOnce $dfrags}
-		__build_impls!{Primary FnMut  $pfrags}
+		__unbox_build_impls!{Derived FnOnce $dfrags}
+		__unbox_build_impls!{Primary FnMut  $pfrags}
 	};
 	(All Fn $pfrags:tt $dfrags:tt) => {
-		__build_impls!{Derived FnOnce $dfrags}
-		__build_impls!{Derived FnMut  $dfrags}
-		__build_impls!{Primary Fn     $pfrags}
+		__unbox_build_impls!{Derived FnOnce $dfrags}
+		__unbox_build_impls!{Derived FnMut  $dfrags}
+		__unbox_build_impls!{Primary Fn     $pfrags}
 	};
 
 	// "All of that, just for this," you ask?
@@ -336,7 +336,7 @@ macro_rules! __build_impls {
 
 //-------------------------------------------------
 
-mod compiletests {
+pub mod compiletests {
 
 	use std::ops::Add;
 
@@ -416,4 +416,4 @@ mod compiletests {
 
 // >_>
 // <_<
-use self::compiletests as examples;
+pub use self::compiletests as examples;
