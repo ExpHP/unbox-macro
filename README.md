@@ -4,6 +4,15 @@ unbox-macro
 Provides an `unbox!` macro for creating unboxed closures
 which are nameable in the type system.
 
+  * [unbox-macro](#unbox-macro)
+    * [Is unbox_macro right for me?](#is-unbox_macro-right-for-me)
+    * [Sounds great! What is it for?](#sounds-great-what-is-it-for)
+    * [unwrap! mini-language](#unwrap-mini-language)
+    * [Why is it so terrible!?](#why-is-it-so-terrible)
+    * [Comparison to alternatives](#comparison-to-alternatives)
+    * [The end](#the-end)
+
+
 Is `unbox_macro` right for me?
 ------------------------------
 
@@ -12,13 +21,11 @@ Possibly!  Do you:
 * Hate future compatibility?
 * Hate backwards compatibility?
 * Get frustrated by seeing useful error messages?
-* Enjoy long walks through [300-lines of `macro_rules!`][1]?
+* Enjoy long walks through [300-lines of `macro_rules!`](https://github.com/ExpHP/unbox-macro/blob/master/src/lib.rs#L22-L331)?
 * Want nobody to use your library?
 * Have a long-standing grudge against yourself, just in general?
 
 Then you're in exactly the right place!
-
-[1] https://github.com/ExpHP/unbox-macro/blob/master/src/lib.rs#L22-L331
 
 
 Sounds great! What is it for?
@@ -304,11 +311,9 @@ perhaps better suited to ~a plugin~--er, I mean procedural macro.
 
 Half of what this macro does now was not even possible two weeks prior
 to me writing this; it was only at the end of July 2016 that [a fix had
-finally been committed for the funny business with `tt` tokens][2].
+finally been committed for the funny business with `tt` tokens](https://github.com/rust-lang/rust/pull/34908).
 Prior to that fix, I could not have even *dreamed* of supporting trait
 bounds (as it would have entailed actually *parsing* them!).
-
-[2] https://github.com/rust-lang/rust/pull/34908
 
 ### Have you seen https://xkcd.com/1205/ ?
 

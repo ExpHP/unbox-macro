@@ -19,6 +19,7 @@ macro_rules! unbox {
 	($($r:tt)*) => {__parse!{a0 [$($r)*]}};
 }
 
+#[macro_export]
 macro_rules! __parse {
 	// The layout of the arguments is as follows: (square brackets are literal)
 	//
@@ -142,6 +143,7 @@ macro_rules! __parse {
 	(j0 [] $($d:tt)*) => {__build!{[] $($d)*}};
 }
 
+#[macro_export]
 macro_rules! __build {
 	// Expect a bunch of preparsed content delimited by square brackets
 	// (the initial empty list serves as a label)
@@ -244,6 +246,7 @@ macro_rules! __build {
 }
 
 // This defines the struct.
+#[macro_export]
 macro_rules! __build_struct {
 	// switch based on $fld
 	([[unitlike        ] [$($vis:tt)*] [$name:ident]]
@@ -262,6 +265,7 @@ macro_rules! __build_struct {
 
 
 // This generates the Fn{Mut,Once,} impls.
+#[macro_export]
 macro_rules! __build_impls {
 	([[$Fn:ident] $name:tt $slf:tt $pat:tt $Args:tt $out:tt $code:tt]
 	 [$spar:tt $fpar:tt $fwhr:tt]) => {
@@ -392,6 +396,15 @@ mod compiletests {
 		Generic({'a,T} where T:'a, T:PartialEq) Struct(&'a Vec<T>)
 		For({'b} where T:'b)
 		Fn Contains(&self, x: &'b T) -> bool { self.0.contains(x) }
+	}
+
+	// README example
+	unbox!{
+		pub Generic({F}) Struct(F)
+		For({A,B,C} where F: FnMut(A,B) -> C)
+		FnMut Uncurry(&mut self, tuple: (A,B)) -> C {
+			(&mut self.0)(tuple.0, tuple.1)
+		}
 	}
 
 	// Example of how it could be used in a return type.
