@@ -335,7 +335,7 @@ Comparison to alternatives
 
 Yes, what about them?
 
-### ...uh... okay, what about the accepted RFC?  Soon, we won't need nameable types!
+### ...uh... okay, what about the accepted `impl Trait` RFC?  Soon, we won't need nameable types!
 
 In its current form, the [`impl Trait` RFC](https://github.com/rust-lang/rfcs/pull/1522) doesn't let you do this:
 
