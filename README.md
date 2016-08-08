@@ -335,17 +335,15 @@ Comparison to alternatives
 
 Yes, what about them?
 
-### ...uh... okay, what about the accepted `[impl Trait][1]` RFC?  Soon, we won't need nameable types!
+### ...uh... okay, what about the accepted RFC?  Soon, we won't need nameable types!
 
-In its current form, that RFC doesn't let you do this:
+In its current form, the [`impl Trait` RFC](https://github.com/rust-lang/rfcs/pull/1522) doesn't let you do this:
 
     let x = my_cool_object.iter();
     println!("{}", x.rev().len());
 
 because it provides no provision for forwarding the `DoubleEndedIterator` and
 `ExactSizeIterator` traits.
-
-[1] https://github.com/rust-lang/rfcs/pull/1522
 
 The end
 -------
