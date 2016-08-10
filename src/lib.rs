@@ -53,8 +53,17 @@ macro_rules! __unbox_parse {
 	(b0 [Generic({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{b5 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
+	(b0 [Generic({$($par:tt)*} $($x:tt)+        ) $($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOUR_Generic_APPEARS_TO_HAVE_BOUNDS_WITH_NO__where__ };
+
 	(b0 [Generic({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{b5 [$($r)*]$($d)* [$($par)*][        ] }};
+
+	(b0 [Generic($($par:tt)*                    ) $($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOU_MUST_DELIMIT_THE_TYPE_PARAMS_IN_Generic_WITH_CURLIES };
+
+	(b0 [Generic$($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOUR_Generic_IS_LOOKING_A_LITTLE_BARE__USE_PARENTHESES };
 
 	(b0 [                                         $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{b5 [$($r)*]$($d)* [        ][        ] }};
@@ -71,8 +80,20 @@ macro_rules! __unbox_parse {
 	(c0 [For({$($par:tt)*} where $($bnd:tt)*) $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{d0 [$($r)*]$($d)* [$($par)*][$($bnd)*] }};
 
+	(c0 [For({$($par:tt)*} $($x:tt)+        ) $($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOUR_For_APPEARS_TO_HAVE_BOUNDS_WITH_NO__where__ };
+
 	(c0 [For({$($par:tt)*}                  ) $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{d0 [$($r)*]$($d)* [$($par)*][        ] }};
+
+	(c0 [For($($par:tt)*                    ) $($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOU_MUST_DELIMIT_THE_TYPE_PARAMS_IN_For_WITH_CURLIES };
+
+	(c0 [For({$($par:tt)*} $($x:tt)*        ) $($r:tt)*]$($d:tt)*) =>
+		{ FOR_ARGUMENT_MISSING_KEYWORD__where__ };
+
+	(c0 [For$($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOUR_For_IS_STARK_NAKED__PLEASE_GIVE_IT_SOME_PARENTHESES };
 
 	(c0 [                                     $($r:tt)*]$($d:tt)*) =>
 		{__unbox_parse!{d0 [$($r)*]$($d)* [        ][        ] }};
@@ -81,6 +102,8 @@ macro_rules! __unbox_parse {
 	(d0 [FnOnce $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[FnOnce]}};
 	(d0 [FnMut  $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[FnMut ]}};
 	(d0 [Fn     $($r:tt)*]$($d:tt)*) => {__unbox_parse!{e0 [$($r)*]$($d)*[Fn    ]}};
+	(d0 [$($r:tt)*]$($d:tt)*) =>
+		{ UNBOX__YOU_DIDNT_SPECIFY_AN_FN_TRAIT___OR_AT_LEAST_NOT_IN_THE_RIGHT_PLACE };
 
 	// Read struct name
 	(e0 [$name:ident $($r:tt)*]$($d:tt)*) => {__unbox_parse!{f0 [$($r)*]$($d)*[$name]}};
