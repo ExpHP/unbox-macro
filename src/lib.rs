@@ -213,8 +213,6 @@ macro_rules! __unbox_build {
 	(b0 [[Fn]         [&self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	(b0 [$Fn:tt    [wildcard]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	(b0 $($r:tt)*) => { YOUR_EXPLICIT_SELF_ARG_HAS_THE_WRONG_SIGIL };
-	// FIXME The error message for a bad `self` arg points to "b0", making
-	//       this restriction significantly less helpful than I intended...
 
 	// push two things onto the end:
 	//   - the struct parameter list
