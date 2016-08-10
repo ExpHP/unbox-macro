@@ -185,9 +185,11 @@ macro_rules! __unbox_build {
 	// Validate the sigil on self against the Fn trait.
 	//  (this was too difficult to do inside the __parse macro)
 	(b0 [[FnOnce]      [self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
+	(b0 [[FnOnce]  [mut self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	(b0 [[FnMut]  [&mut self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	(b0 [[Fn]         [&self]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
 	(b0 [$Fn:tt    [wildcard]] $($r:tt)*) => {__unbox_build!{c0 $($r)*}};
+	(b0 $($r:tt)*) => { YOUR_EXPLICIT_SELF_ARG_HAS_THE_WRONG_SIGIL };
 	// FIXME The error message for a bad `self` arg points to "b0", making
 	//       this restriction significantly less helpful than I intended...
 
