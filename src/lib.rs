@@ -69,7 +69,7 @@ macro_rules! __unbox_parse {
 		{__unbox_parse!{b5 [$($r)*]$($d)* [        ][        ] }};
 
 	// Read field list
-	// NOTE: don't blindly rearrange; must always ensure first mismatch is a nonterminal
+	// NOTE: don't blindly rearrange; must always ensure first mismatch is a terminal
 	(b5 [Struct(           ) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[ unitlike ]}};
 	(b5 [Struct($($fld:tt)+) $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[[$($fld)+]]}};
 	(b5 [Struct{$($fld:tt)*} $($r:tt)*]$($d:tt)*) => {__unbox_parse!{c0 [$($r)*]$($d)*[{$($fld)*}]}};
@@ -257,7 +257,7 @@ macro_rules! __unbox_build {
 	// |
 	//&&&--------------------------------------------------------------
 
-	// Forward the aaprpriate fragments to more dedicated macros.
+	// Forward the appropriate fragments to more dedicated macros.
 	(d0 $sfrags:tt $ifrags:tt $spar:tt $fpar:tt $swhr:tt $fwhr:tt) => {
 		// Recall that:
 		//   $sfrags = [$fld $vis $name]
