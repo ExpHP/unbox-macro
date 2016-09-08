@@ -17,7 +17,7 @@ which are nameable in the type system.
 Is `unbox_macro` right for me?
 ------------------------------
 
-Possibly!  Do you:
+Possibly! Do you:
 
 * Hate future compatibility?
 * Hate backwards compatibility?
@@ -27,7 +27,6 @@ Possibly!  Do you:
 * Have a long-standing grudge against yourself, just in general?
 
 Then you're in exactly the right place!
-
 
 Sounds great! What is it for?
 -----------------------------
@@ -282,6 +281,10 @@ YES I'M SORRY OKAY
 Comparison to alternatives
 --------------------------
 
+### What about `Box<Iterator>` or `&Iterator`?
+
+Yes, what about them?
+
 ### What about the accepted `impl Trait` RFC?  Soon, we won't need nameable types!
 
 In its accepted form,
@@ -306,9 +309,18 @@ With `unbox_macro`, the above snippet works
 because `zip_with`'s return type can be
 explicitly defined in terms of `Zip` and `Map`.
 
-### What about `Box<Iterator>` or `&Iterator`?
+### No no no, not like that!  [I mean, why not return `impl FnMut(T) -> U`?](https://users.rust-lang.org/t/crates-for-functional-programming/7213/9)
 
-Yes, what about them?
+Because...
+
+Because...
+
+Oh.
+
+Well, okay, I guess you can do that if all you really need is a higher-order function,
+and don't plan to use it to create an iterator.  (To date though there still are no
+provisions in the language for naming the resulting type though, so it's kind of
+an orthogonal solution to this)
 
 ---------------------------------------------------------------
 
