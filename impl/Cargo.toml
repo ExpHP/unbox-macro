@@ -1,0 +1,16 @@
+[package]
+name = "unbox-impl"
+version = "0.1.0"
+authors = ["Michael Lamparski <diagonaldevice@gmail.com>"]
+
+[lib]
+path = "lib.rs"
+crate-type = ["proc-macro"]
+
+[dependencies]
+proc-macro-hack = "0.4"
+proc-macro2 = "0.2"
+syn = { version = "0.12.10", features = ["full", "visit", "visit-mut", "fold"] }
+quote = "0.4.2"
+extension-trait = "0.1.2"
+enum-map = "0.2.24"

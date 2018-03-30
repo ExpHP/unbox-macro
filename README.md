@@ -1,3 +1,14 @@
+`unbox-macro`: Proc macro branch
+================================
+
+Welcome to the experimental proc-macro branch of `unbox-macro`!
+
+This is an effort towards updating this old piece of trash into a crate suitable for publication on crates.io. The updated crate will be suitable for use on stable (for deriving any triple of traits that *resemble* the Fn heirarchy).
+
+**What follows is the original README.md, of which approximately 0% still applies to this branch.**
+
+---
+
 unbox-macro
 ===========
 

@@ -1,6 +1,11 @@
 [package]
-name = "unbox_macro"
-version = "0.2.0"
+name = "unbox"
+version = "0.3.0"
 authors = ["Michael Lamparski <diagonaldevice@gmail.com>"]
 
+[lib]
+path = "lib.rs"
+
 [dependencies]
+proc-macro-hack = "0.4"
+unbox-impl = { path = "impl" }
