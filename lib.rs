@@ -18,6 +18,14 @@ proc_macro_item_decl! {
 /// Eh, what's up docs?
 ///
 /// FIXME
+///
+/// # Syntax
+///
+/// FIXME
+///
+/// # Scope directives
+///
+/// FIXME
 #[macro_export]
 macro_rules! unbox {
     (
@@ -36,7 +44,6 @@ macro_rules! unbox {
             // ...yeah. I don't know.
             #[doc(hidden)]
             #[allow(non_snake_case)]
-            #[allow(unused)]
             pub fn __a_pub_thing_you_shouldnt_worry_about() {}
         }
     };
@@ -47,6 +54,7 @@ macro_rules! unbox {
         #![unbox(block_scope)]
         $($tt:tt)*
     ) => {
+        #[allow(non_snake_case)]
         let __unbox_block_scope_is_only_for_use_in_fn_bodies__sorry = ();
 
         unbox_hack!{ $($tt)* }
