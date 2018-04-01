@@ -2,10 +2,13 @@
 #[macro_use] extern crate quote;
 #[macro_use] extern crate syn;
 #[macro_use] extern crate enum_map;
+extern crate strfmt;
 extern crate proc_macro;
 extern crate proc_macro2;
 
-use syn::{Attribute, Expr, Generics, Ident, Item, Pat, Type, Visibility};
+use self::cfg::Config;
+
+use syn::{Attribute, Expr, FnArg, Generics, Ident, Item, Pat, Type, Visibility};
 use syn::punctuated::Punctuated;
 use syn::synom::Synom;
 
@@ -13,11 +16,6 @@ use syn::synom::Synom;
 use syn::token::Comma;
 
 use quote::ToTokens;
-
-use enum_map::EnumMap;
-
-#[allow(unused)]
-const CONFIG_ATTR: &'static str = "unbox";
 
 proc_macro_item_impl! {
     pub fn unbox_hack_impl(input: &str) -> String {
@@ -31,18 +29,10 @@ proc_macro_item_impl! {
     }
 }
 
-// parse_quote with debug info
-macro_rules! parse_quote {
-    ($($t:tt)*)
-    => {{
-        let tokens: ::proc_macro2::TokenStream = quote!{$($t)*}.into();
-        ::syn::parse2(tokens.clone())
-            .unwrap_or_else(|e| panic!(
-                "{}:{}: BUG in unbox macro: {}\nTOKENS: {}",
-                file!(), line!(), e, tokens,
-            ))
-    }};
-}
+#[macro_use]
+mod macros;
+mod cfg;
+mod util;
 
 mod parse {
     use super::*;
@@ -88,7 +78,7 @@ mod parse {
         pub(crate) generics: Generics, // includes where clause
         #[allow(unused)]
         pub(crate) paren_token: syn::token::Paren,
-        pub(crate) inputs: Punctuated<syn::FnArg, Comma>,
+        pub(crate) inputs: Punctuated<FnArg, Comma>,
         pub(crate) return_type: syn::ReturnType,
         pub(crate) body: syn::Block,
     }
@@ -105,7 +95,7 @@ mod parse {
         pub(crate) fn_spec: FnSpec,
         #[allow(unused)]
         pub(crate) paren_token: syn::token::Paren,
-        pub(crate) inputs: Punctuated<syn::FnArg, Comma>,
+        pub(crate) inputs: Punctuated<FnArg, Comma>,
         pub(crate) return_type: syn::ReturnType,
         pub(crate) body: syn::Block,
     }
@@ -219,9 +209,7 @@ enum FnKind { FnOnce, FnMut, Fn }
 fn do_unbox(is_inmod: bool, input: &str) -> String
 {
     let tokens = input.parse().expect("couldn't parse token stream");
-    let invocation = syn::parse(tokens).unwrap_or_else(|e| {
-        panic!("unbox macro: syntax error: {}", e);
-    });
+    let invocation = syn::parse(tokens).unwrap_or_else(|e| error!("{}", e));
 
     let mut items = vec![];
     handle_invocation(&mut items, is_inmod, invocation);
@@ -237,12 +225,7 @@ fn handle_invocation(
     invocation: parse::InvocationBody,
 ) {
     let parse::InvocationBody { config_attrs, items } = invocation;
-    assert_eq!(
-        config_attrs.len(), 0,
-        "Sorry, config attributes for unbox! are not yet implemented.",
-    );
-
-    let config = Default::default();
+    let config = Config::from_inner_attrs(&config_attrs);
     for in_item in items {
         handle_one(out, &config, is_inmod, in_item);
     }
@@ -257,7 +240,7 @@ fn handle_one(
 
     let panic_on_attrs = |name, attrs: &[_]| {
         if !attrs.is_empty() {
-            panic!("unbox macro: error: attributes on {} are not supported", name);
+            error!("attributes on {} are not supported", name);
         }
     };
 
@@ -293,7 +276,7 @@ fn handle_one(
         false => struct_item,
     };
 
-    let params_info = inputs.into();
+    let params_info = ParamsInfo::from_params(config, inputs);
     let generics_info = generics_info::Input {
         impl_generics,
         struct_generics: struct_item.generics.clone(),
@@ -390,13 +373,14 @@ fn merge_generics(a: Generics, b: Generics) -> Generics {
 //--------------------------------------------------------------
 
 pub(crate) struct ParamsInfo {
-    pub(crate) self_param: Option<syn::FnArg>,
-    pub(crate) args_pat: Pat,
-    pub(crate) args_ty: Type,
+    pub(crate) self_param: Option<FnArg>,
+    pub(crate) trait_args: Vec<Type>,
+    pub(crate) args_pats: Vec<Pat>,
+    pub(crate) args_tys: Vec<Type>,
 }
 
-impl From<Punctuated<syn::FnArg, Comma>> for ParamsInfo {
-    fn from(params: Punctuated<syn::FnArg, Comma>) -> Self {
+impl ParamsInfo {
+    fn from_params(config: &Config, params: Punctuated<FnArg, Comma>) -> Self {
         use std::iter::once;
 
         let mut pairs = params.into_iter();
@@ -405,24 +389,31 @@ impl From<Punctuated<syn::FnArg, Comma>> for ParamsInfo {
                 None => (None, vec![]),
 
                 Some(first) => match first {
-                    first@syn::FnArg::SelfRef(_) |
-                    first@syn::FnArg::SelfValue(_) => (Some(first), pairs.collect()),
+                    first@FnArg::SelfRef(_) |
+                    first@FnArg::SelfValue(_) => (Some(first), pairs.collect()),
 
                     first => (None, once(first).chain(pairs).collect()),
                 },
             }
         };
-        let (pats, tys): (Vec<_>, Vec<_>) = {
+        let (arg_pats, arg_tys): (Vec<_>, Vec<_>) = {
             pairs.into_iter()
                 .map(|arg| match arg {
-                    syn::FnArg::Captured(arg) => (arg.pat, arg.ty),
-                    arg => panic!("unbox macro: error: bad argument: {}", arg.into_tokens()),
+                    FnArg::Captured(arg) => (arg.pat, arg.ty),
+                    arg => error!("bad argument: {}", arg.into_tokens()),
                 })
                 .unzip()
         };
-        let args_pat = parse_quote!{ ( #(#pats,)* ) };
-        let args_ty  = parse_quote!{ ( #(#tys,)*  ) };
-        ParamsInfo { self_param, args_pat, args_ty }
+        let trait_generics = config.generics.gen_tys(&arg_tys);
+        let args_tys = config.args_ty.gen_tys(&arg_tys);
+        let args_pats = config.args_pat.gen_pats(&arg_pats);
+        if args_tys.len() != args_pats.len() {
+            error!(
+                "The specified configs for '{}' and '{}' produced different numbers of arguments!",
+                cfg::CFG_NODE_ARGS_TY, cfg::CFG_NODE_ARGS_PAT,
+            )
+        }
+        ParamsInfo { self_param, trait_args: trait_generics, args_pats, args_tys }
     }
 }
 
@@ -543,10 +534,10 @@ fn generate_impl_if_applicable(
     };
 
     let (impl_generics, self_generics, where_clause) = generics_info.split_for_impl();
-    let ParamsInfo { ref args_ty, .. } = *params_info;
+    let ParamsInfo { ref trait_args, .. } = *params_info;
     let impl_trait_path = &config.traits.0[impl_kind];
     out.push(parse_quote!{
-        impl #impl_generics #impl_trait_path<#args_ty> for #struct_name #self_generics
+        impl #impl_generics #impl_trait_path<#(#trait_args),*> for #struct_name #self_generics
         #where_clause
         {
             #assoc_ty_item
@@ -567,38 +558,58 @@ fn primary_impl_method_item(
 {
     let impl_method_name = &config.methods.0[kind];
 
-    let ParamsInfo { ref self_param, ref args_pat, ref args_ty } = *params_info;
+    let ParamsInfo { ref self_param, ref args_pats, ref args_tys, trait_args: _ } = *params_info;
+
+    // args with patterns as the user wrote them...
+    let true_args = {
+        if args_pats.len() != args_tys.len() {
+            bug!("mismatch in args count for pats/tys (shouldn't this have been caught earlier?)");
+        }
+        args_pats.iter().zip(args_tys.iter())
+            .map(|(pat, ty)| syn::ArgCaptured {
+                pat: pat.clone(),
+                ty: ty.clone(),
+                colon_token: Default::default(),
+            }).collect::<Vec<_>>()
+    };
 
     match *self_param {
         // if the user specifies a `self` arg, use it so that it gets type-checked
         Some(ref self_param) => {
             parse_quote!{
-                fn #impl_method_name ( #self_param, #args_pat: #args_ty ) #return_type
+                fn #impl_method_name ( #self_param #(,#true_args)* ) #return_type
                 #block
             }
         },
         // Otherwise, generate a `self` arg, and make it inaccessible to the fn body
         None => {
-            let self_param: syn::FnArg = match kind {
+            let self_param: FnArg = match kind {
                 FnKind::FnOnce => parse_quote!{ self },
                 FnKind::FnMut  => parse_quote!{ &mut self },
                 FnKind::Fn     => parse_quote!{ &self },
             };
+
+            // total_split_for_impl surprisingly carries its weight here;
+            // this trick declares a fn item with all of the type params,
+            //   and to call it we need a turbofish with all of the params.
             let (impl_generics, generic_args, where_clause) = generics_info.total_split_for_impl();
             let turbofish = generic_args.as_turbofish();
+
+            // args with simple ident patterns (and expressions) for forwarding
+            let (signature_args, delegated_args) = unhygienic_args_from_types(args_tys);
+
             parse_quote!{
-                fn #impl_method_name ( #self_param, args: #args_ty ) #return_type {
+                fn #impl_method_name ( #self_param #(, #signature_args)* ) #return_type {
                     // Simulate hygiene with an inner fn item to hide `self`.
                     // Generic parameters are shadowed with identical copies defined
                     //  on the function.  Fingers crossed, mates...
-                    fn inner #impl_generics (#args_pat: #args_ty) #return_type
+                    fn inner #impl_generics ( #(#true_args),* ) #return_type
                     #where_clause
                     #block
 
                     // supply a turbofish to dodge "type annotations needed" errors
-                    // which would otherwise not occur
                     // FIXME: This needs a test case...
-                    inner #turbofish (args)
+                    inner #turbofish ( #(#delegated_args),* )
                 }
             }
         },
@@ -613,7 +624,7 @@ fn secondary_impl_method_item(
     impl_kind: FnKind,
 ) -> syn::ImplItem
 {
-    let (signature_self, delegated_self): (syn::FnArg, Expr) = {
+    let (signature_self, delegated_self): (FnArg, Expr) = {
         match (impl_kind, delegated_kind) {
             (FnKind::FnMut,  FnKind::Fn) =>    (parse_quote!{ &mut self }, parse_quote!{ self }),
             (FnKind::FnOnce, FnKind::Fn) =>    (parse_quote!{ self },      parse_quote!{ &self }),
@@ -624,66 +635,55 @@ fn secondary_impl_method_item(
     let delegated_path = config.trait_method_qualified_path(delegated_kind);
 
     let impl_method_name = &config.methods.0[impl_kind];
-    let ParamsInfo { ref args_ty, .. } = *params_info;
+    let ParamsInfo { ref args_tys, .. } = *params_info;
+
+    let (signature_args, delegated_args) = unhygienic_args_from_types(args_tys);
 
     parse_quote!{
-        fn #impl_method_name ( #signature_self, args: #args_ty ) #return_type
-        { #delegated_path ( #delegated_self, args) }
+        fn #impl_method_name ( #signature_self #(,#signature_args)* ) #return_type
+        { #delegated_path ( #delegated_self #(,#delegated_args)*) }
     }
 }
 
-//--------------------------------------------------------------
+// suitable for use only where nothing else could possibly see the bindings.
+fn unhygienic_args_from_types(types: &[Type]) -> (Vec<FnArg>, Vec<Expr>) {
+    let prefixes = &["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+    let suffixes = &["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 
-#[derive(Default)]
-struct Config {
-    pub(crate) traits: cfg::Traits,
-    pub(crate) methods: cfg::Methods,
-    pub(crate) output: cfg::Output,
-}
-
-impl Config {
-    /// Not full-on UFCS, but close.  (`Trait::method`)
-    pub fn trait_method_qualified_path(&self, kind: FnKind) -> syn::Path
-    {
-        let mut path = self.traits.0[kind].clone();
-        path.segments.push(self.methods.0[kind].clone().into());
-        path
-    }
-}
-
-mod cfg {
-    use super::*;
-
-    pub(crate) struct Traits(pub(crate) EnumMap<FnKind, syn::Path>);
-    pub(crate) struct Methods(pub(crate) EnumMap<FnKind, Ident>);
-    pub(crate) struct Output(pub(crate) Ident);
-
-    impl Default for Traits {
-        fn default() -> Self
-        { Traits(enum_map![
-            // the defaults use locally-resolved names rather than absolute paths
-            // in order to reduce the need to supply this configuration.
-            // (if the defaults used `::std::ops` prefixes then you'd be required
-            //  to configure this in every call to have any hope of using it on stable)
-            FnKind::Fn     => parse_quote!{Fn},
-            FnKind::FnMut  => parse_quote!{FnMut},
-            FnKind::FnOnce => parse_quote!{FnOnce},
-        ])}
+    let max_len = prefixes.len() * suffixes.len();
+    if max_len < types.len() {
+        error!(
+            "Your method has {} arguments.  That's an awful lot of arguments, right?\
+            Please try to bring it down to... say... around {}.",
+            types.len(), max_len,
+        )
     }
 
-    impl Default for Methods {
-        fn default() -> Self
-        { Methods(enum_map![
-            FnKind::Fn     => "call".into(),
-            FnKind::FnMut  => "call_mut".into(),
-            FnKind::FnOnce => "call_once".into(),
-        ])}
-    }
-
-    impl Default for Output {
-        fn default() -> Self
-        { Output(Ident::from("Output")) }
-    }
+    let idents: Vec<_> = {
+        prefixes.iter()
+            .flat_map(|p| suffixes.iter().map(move |s| Ident::from(format!("{}{}", p, s))))
+            .take(types.len())
+            .collect()
+    };
+    let exprs = idents.iter().map(|id| parse_quote!(#id)).collect();
+    let fn_args = {
+        idents.iter()
+            .zip(types)
+            .map(|(name, ty)| {
+                syn::ArgCaptured {
+                    pat: syn::PatIdent {
+                        ident: name.clone(),
+                        by_ref: None,
+                        subpat: None,
+                        mutability: None,
+                    }.into(),
+                    colon_token: Default::default(),
+                    ty: ty.clone()
+                }.into()
+            })
+            .collect()
+    };
+    (fn_args, exprs)
 }
 
 //--------------------------------------------------------------
