@@ -21,19 +21,47 @@ proc_macro_item_decl! {
 #[macro_export]
 macro_rules! unbox {
     (
-        in mod $mod_name:ident {
-            $($tt:tt)*
-        }
+        #![unbox(mod_scope($mod_name:ident))]
+        $($tt:tt)*
     ) => {
+        #[allow(unused)]
         pub use self::$mod_name::*;
         mod $mod_name {
+            #[allow(unused)]
             use super::*;
 
-            // FIXME: use unbox_hack_inmod!{ $($tt)* }
-            unbox_hack!{ $($tt)* }
+            unbox_hack_inmod!{ $($tt)* }
+
+            // "error: A non-empty glob must import something with the glob's visibility"
+            // ...yeah. I don't know.
+            #[doc(hidden)]
+            #[allow(non_snake_case)]
+            #[allow(unused)]
+            pub fn __a_pub_thing_you_shouldnt_worry_about() {}
         }
     };
-    ($($tt:tt)*) => {
+
+    // For defining an unboxed closure without wrapping the call in a module.
+    // Needed inside fn bodies.
+    (
+        #![unbox(block_scope)]
+        $($tt:tt)*
+    ) => {
+        let __unbox_block_scope_is_only_for_use_in_fn_bodies__sorry = ();
+
         unbox_hack!{ $($tt)* }
+    };
+
+    (
+        $($tt:tt)*
+    ) => {
+        // This is the cost of procedural macros pre-macros 2.0, guys.
+        // Grin and bear it.
+        compile_error!{r#"\
+            Any call to unbox! must \
+            begin with a `mod_scope` or `block_scope` directive. \
+            Please see the documentation of `unbox!` for more details \
+            (under "Scope directives").\
+        "#}
     };
 }

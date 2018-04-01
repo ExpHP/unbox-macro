@@ -10,7 +10,7 @@ use syn::punctuated::Punctuated;
 use syn::synom::Synom;
 
 // sorry, Token![]. Wake me up when intellij-rust can parse type macros
-use syn::token::{Comma, Paren};
+use syn::token::Comma;
 
 use quote::ToTokens;
 
@@ -21,16 +21,13 @@ const CONFIG_ATTR: &'static str = "unbox";
 
 proc_macro_item_impl! {
     pub fn unbox_hack_impl(input: &str) -> String {
-        // (put the definition outside this macro call for the sake of IDEs)
-        do_unbox(input)
+        do_unbox(false, input)
     }
 }
 
 proc_macro_item_impl! {
     pub fn unbox_hack_inmod_impl(input: &str) -> String {
-        // should replace Visibility::Inherited with `pub(super)`
-        unimplemented!();
-        //do_unbox(input)
+        do_unbox(true, input)
     }
 }
 
@@ -54,7 +51,7 @@ mod parse {
 
     pub(crate) struct InvocationBody {
         pub(crate) config_attrs: Vec<Attribute>,
-        pub(crate) items: Vec<UnboxedItems>,
+        pub(crate) items: Vec<UnboxedItemsKind>,
     }
 
     impl Synom for InvocationBody {
@@ -67,90 +64,60 @@ mod parse {
 
     // ---------
 
-    pub(crate) struct UnboxedItems {
-        pub(crate) klass: Option<syn::ItemStruct>,
-        pub(crate) impul: ItemUnboxedImpl,
+    pub(crate) enum UnboxedItemsKind {
+        Shuga(UnboxedItemsShuga),
+        Spyce(UnboxedItemsSpyce),
     }
 
-    impl Synom for UnboxedItems {
-        named!(parse -> Self, do_parse!(
-            klass: option!(syn!(_)) >>
-            impul: syn!(_) >>
-            (UnboxedItems { klass, impul })
+    impl Synom for UnboxedItemsKind {
+        named!(parse -> Self, alt!(
+            syn!(_) => { UnboxedItemsKind::Shuga }
+            |
+            syn!(_) => { UnboxedItemsKind::Spyce }
         ));
     }
 
-    impl UnboxedItems {
-        pub(crate) fn determine_vis(&self) -> Visibility {
-            match *self {
-                UnboxedItems {
-                    klass: Some(syn::ItemStruct { ref vis, .. }),
-                    impul: ItemUnboxedImpl { vis: Visibility::Inherited, .. },
-                } => vis.clone(),
-
-                UnboxedItems {
-                    klass: None,
-                    impul: ItemUnboxedImpl { ref vis, .. }
-                } => vis.clone(),
-
-                UnboxedItems {
-                    klass: Some(_),
-                    impul: _
-                } => panic!("\
-                    unbox macro: error: visibility on the Fn item is forbidden \
-                    when a struct is provided.\
-                "),
-            }
-        }
-
-        pub(crate) fn find_ident(&self) -> &Ident {
-            let klass_ident = self.klass.as_ref().map(|klass| &klass.ident);
-            let fn_ident = self.impul.ident.as_ref();
-            match (klass_ident, fn_ident) {
-                (Some(ident), None) => ident,
-                (None, Some(ident)) => ident,
-                (Some(klass_ident), Some(fn_ident)) =>{
-                    assert_eq!(
-                        klass_ident, fn_ident,
-                        "unbox macro: error: Inconsistent names",
-                    );
-                    klass_ident
-                },
-                (None, None) => panic!("unbox macro: error: No name provided"),
-            }
-        }
-    }
-
-
     // ---------
 
-    pub(crate) struct ItemUnboxedImpl {
+    pub(crate) struct UnboxedItemsShuga {
+        // `Fn` item
+        pub(crate) attrs: Vec<Attribute>,
         pub(crate) vis: Visibility,
-        // pub(crate) struct_spec: Option<StructSpec>,
-        // pub(crate) for_spec: Option<ForSpec>,
         pub(crate) fn_spec: FnSpec,
-        pub(crate) ident: Option<Ident>,
+        pub(crate) ident: Ident,
         pub(crate) generics: Generics, // includes where clause
         #[allow(unused)]
-        pub(crate) paren_token: Paren,
+        pub(crate) paren_token: syn::token::Paren,
         pub(crate) inputs: Punctuated<syn::FnArg, Comma>,
         pub(crate) return_type: syn::ReturnType,
         pub(crate) body: syn::Block,
     }
 
-    impl Synom for ItemUnboxedImpl {
-        named!(parse -> Self, do_parse!(
-            attrs:   many0!(call!(Attribute::parse_outer)) >>
-            _i_lied: value!({
-                if !attrs.is_empty() {
-                    panic!("unbox macro: error: attributes on the Fn item are not supported")
-                }
-            }) >>
+    pub(crate) struct UnboxedItemsSpyce {
+        pub(crate) struct_item: syn::ItemStruct,
+
+        // impl item
+        pub(crate) attrs: Vec<Attribute>,
+        #[allow(unused)]
+        pub(crate) impl_token: syn::token::Impl,
+        #[allow(unused)]
+        pub(crate) generics: Generics, // includes where clause
+        pub(crate) fn_spec: FnSpec,
+        #[allow(unused)]
+        pub(crate) paren_token: syn::token::Paren,
+        pub(crate) inputs: Punctuated<syn::FnArg, Comma>,
+        pub(crate) return_type: syn::ReturnType,
+        pub(crate) body: syn::Block,
+    }
+
+    impl Synom for UnboxedItemsShuga {
+        named!{parse -> Self, do_parse!(
+            attrs:        many0!(call!(Attribute::parse_outer)) >>
 
             vis:          syn!(_) >>
 
             fn_spec:      syn!(_) >>
-            ident:        option!(syn!(_)) >>
+            ident:        syn!(_) >>
             generics:     syn!(_) >>
 
             // FIXME retarded.  Is there really no way to just pattern match?
@@ -163,19 +130,56 @@ mod parse {
 
             body:         syn!(_) >>
 
-            generics:     value!({
-                let mut generics: Generics = generics;
-                // (it came from Synom, so it shouldn't have a `where` clause)
-                assert!(generics.where_clause.is_none());
-                generics.where_clause = where_clause;
-                generics
-            }) >>
+            generics:     value!(supply_missing_where(generics, where_clause)) >>
 
-            (ItemUnboxedImpl {
-                vis, fn_spec, ident, generics,
+            (UnboxedItemsShuga {
+                attrs, vis, fn_spec, ident, generics,
                 paren_token, inputs, return_type, body,
             })
-        ));
+        )}
+    }
+
+    impl Synom for UnboxedItemsSpyce {
+        named!{parse -> Self, do_parse!(
+            struct_item:  syn!(_) >>
+
+            attrs:        many0!(call!(Attribute::parse_outer)) >>
+
+            impl_token:   syn!(_) >>
+
+            fn_spec:      syn!(_) >>
+
+            generics:     syn!(_) >>
+
+            // FIXME retarded.  Is there really no way to just pattern match?
+            _toople:      parens!(call!(Punctuated::parse_terminated)) >>
+            paren_token:  value!(_toople.0) >>
+            inputs:       value!(_toople.1) >>
+            return_type:  syn!(_) >>
+
+            where_clause: option!(syn!(_)) >>
+
+            body:         syn!(_) >>
+
+            generics:     value!(supply_missing_where(generics, where_clause)) >>
+
+            (UnboxedItemsSpyce {
+                struct_item, attrs, impl_token, generics,
+                fn_spec, paren_token, inputs, return_type, body,
+            })
+        )}
+    }
+
+    fn supply_missing_where(
+        generics_from_synom: Generics,
+        where_clause: Option<syn::WhereClause>,
+    ) -> Generics
+    {
+        let mut generics = generics_from_synom;
+        // generics from synom never have a where clause
+        assert!(generics.where_clause.is_none());
+        generics.where_clause = where_clause;
+        generics
     }
 
     // ---------
@@ -205,12 +209,14 @@ mod parse {
 
 }
 
+//--------------------------------------------------------------
+
 // `Ord` reflects capabilities provided to the caller;  `FnOnce` is the least.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(EnumMap)]
 enum FnKind { FnOnce, FnMut, Fn }
 
-fn do_unbox(input: &str) -> String
+fn do_unbox(is_inmod: bool, input: &str) -> String
 {
     let tokens = input.parse().expect("couldn't parse token stream");
     let invocation = syn::parse(tokens).unwrap_or_else(|e| {
@@ -218,7 +224,7 @@ fn do_unbox(input: &str) -> String
     });
 
     let mut items = vec![];
-    handle_invocation(&mut items, invocation);
+    handle_invocation(&mut items, is_inmod, invocation);
 
     quote!(#(#items)*).to_string()
 }
@@ -227,6 +233,7 @@ fn do_unbox(input: &str) -> String
 
 fn handle_invocation(
     out: &mut Vec<Item>,
+    is_inmod: bool,
     invocation: parse::InvocationBody,
 ) {
     let parse::InvocationBody { config_attrs, items } = invocation;
@@ -237,46 +244,62 @@ fn handle_invocation(
 
     let config = Default::default();
     for in_item in items {
-        handle_one(out, &config, in_item);
+        handle_one(out, &config, is_inmod, in_item);
     }
 }
 
 fn handle_one(
     out: &mut Vec<Item>,
     config: &Config,
-    user_items: parse::UnboxedItems,
+    is_inmod: bool,
+    user_items: parse::UnboxedItemsKind,
 ) {
-    // Tear the user input apart into orthogonal pieces meaningful for output.
-    // Do it in a block so useless things can fall out of scope.
-    let vis = user_items.determine_vis();
-    let struct_name = user_items.find_ident().clone();
 
-    let parse::UnboxedItems {
-        klass: struct_item,
-        impul: parse::ItemUnboxedImpl {
-            fn_spec: parse::FnSpec {
-                kind,
-                ident: _,
-            },
-            inputs,
-            body,
-            return_type,
-            generics: fn_generics,
-            vis: _, // already accounted for
-            ident: _, // already accounted for
-            paren_token: _,
+    let panic_on_attrs = |name, attrs: &[_]| {
+        if !attrs.is_empty() {
+            panic!("unbox macro: error: attributes on {} are not supported", name);
         }
-    } = user_items;
+    };
 
-    let struct_item = struct_item.unwrap_or_else(|| {
-        parse_quote!{ #vis struct #struct_name; }
-    });
+    let stuff = match user_items {
+        parse::UnboxedItemsKind::Shuga(
+            parse::UnboxedItemsShuga {
+                generics: impl_generics,
+                attrs, vis, ident,
+                fn_spec, inputs, return_type, body,
+                ..
+            }
+        ) => {
+            panic_on_attrs("a Fn item", &attrs);
+            let struct_item = parse_quote!{ #vis struct #ident; };
+            (struct_item, impl_generics, fn_spec, inputs, return_type, body)
+        },
+        parse::UnboxedItemsKind::Spyce(
+           parse::UnboxedItemsSpyce {
+               generics: impl_generics,
+               attrs, struct_item,
+               fn_spec, inputs, return_type, body,
+               ..
+           }
+        ) => {
+            panic_on_attrs("the impl item", &attrs);
+            (struct_item, impl_generics, fn_spec, inputs, return_type, body)
+        },
+    };
+    let (struct_item, impl_generics, fn_spec, inputs, return_type, body) = stuff;
+
+    let struct_item = match is_inmod {
+        true => inmod::fix_visibilities(struct_item),
+        false => struct_item,
+    };
 
     let params_info = inputs.into();
     let generics_info = generics_info::Input {
-        fn_generics,
+        impl_generics,
         struct_generics: struct_item.generics.clone(),
     }.compute();
+
+    let struct_name = struct_item.ident.clone();
 
     out.push(struct_item.into());
 
@@ -285,7 +308,7 @@ fn handle_one(
         generate_impl_if_applicable(
             out,
             config,
-            kind,
+            fn_spec.kind,
             &struct_name,
             &params_info,
             &generics_info,
@@ -306,7 +329,7 @@ mod generics_info {
     use super::*;
 
     pub(crate) struct Input {
-        pub(crate) fn_generics: Generics,
+        pub(crate) impl_generics: Generics,
         pub(crate) struct_generics: Generics,
     }
 
@@ -317,8 +340,8 @@ mod generics_info {
 
     impl Input {
         pub(crate) fn compute(self) -> GenericsInfo {
-            let Input { fn_generics, struct_generics } = self;
-            let total_generics = merge_generics(struct_generics.clone(), fn_generics);
+            let Input { impl_generics, struct_generics } = self;
+            let total_generics = merge_generics(struct_generics.clone(), impl_generics);
             GenericsInfo { total_generics, struct_generics }
         }
     }
@@ -342,8 +365,6 @@ mod generics_info {
         { self.total_generics.split_for_impl() }
     }
 }
-
-//--------------------------------------------------------------
 
 fn merge_generics(a: Generics, b: Generics) -> Generics {
     Generics {
@@ -402,6 +423,83 @@ impl From<Punctuated<syn::FnArg, Comma>> for ParamsInfo {
         let args_pat = parse_quote!{ ( #(#pats,)* ) };
         let args_ty  = parse_quote!{ ( #(#tys,)*  ) };
         ParamsInfo { self_param, args_pat, args_ty }
+    }
+}
+
+//--------------------------------------------------------------
+
+mod inmod {
+    use super::*;
+
+    /// Updates visibilities in `inmod` to work as if the nested module were not there.
+    ///
+    /// This is NOT idempotent.
+    pub(crate) fn fix_visibilities(item: syn::ItemStruct) -> syn::ItemStruct {
+        use ::syn::fold::Fold;
+
+        struct Folder;
+        impl Fold for Folder {
+            fn fold_visibility(&mut self, i: Visibility) -> Visibility { update_visibility(i) }
+
+            fn fold_item_mod(&mut self, _i: syn::ItemMod) -> syn::ItemMod {
+                // I guess inner modules should have visibilites reinterpreted as relative to the
+                // path where they appear after reexport. Unless... uh, I don't know.
+                panic!("\
+                    unbox! does not support nested modules in the struct item, \
+                    but bravo on making this error message appear!\
+                ")
+            }
+        }
+
+        Folder.fold_item_struct(item)
+    }
+
+    fn update_visibility(vis: Visibility) -> Visibility {
+        match vis {
+            Visibility::Inherited => parse_quote!{ pub(super) },
+            Visibility::Restricted(mut vis) => {
+                let mut path = vis.path;
+                vis.path = match path.global() {
+                    true => path,
+                    false => {
+                        let old = ::std::mem::replace(&mut path.segments, Default::default());
+
+                        // simplified from a lengthier but equivalent implementation;
+                        // there's a surprising number of edge cases hidden in here,
+                        // but I'll let the unit tests speak for themselves.
+                        path.segments.push(parse_quote!{super});
+                        path.segments.extend(old.into_iter().filter(|seg| seg.ident != "self"));
+                        path
+                    },
+                };
+                // `pub(super::super)` without `in` is invalid
+                vis.in_token.get_or_insert_with(Default::default);
+                vis.into()
+            },
+            vis@Visibility::Public(_) |
+            vis@Visibility::Crate(_) => vis,
+        }
+    }
+
+    #[test]
+    fn test_update_visibility() {
+        macro_rules! vis { ($($t:tt)*) => { let v: Visibility = parse_quote!{$($t)*}; v }; }
+        let f = update_visibility;
+        assert_eq!(f(vis!{pub(self)}),          vis!{pub(in super)});
+        assert_eq!(f(vis!{pub(in self)}),       vis!{pub(in super)});
+        assert_eq!(f(vis!{pub(in self::a::b)}), vis!{pub(in super::a::b)});
+
+        assert_eq!(f(vis!{pub(super)}),           vis!{pub(in super::super)});
+        assert_eq!(f(vis!{pub(in super)}),        vis!{pub(in super::super)});
+        assert_eq!(f(vis!{pub(in super::a)}),     vis!{pub(in super::super::a)});
+        assert_eq!(f(vis!{pub(in super::super)}), vis!{pub(in super::super::super)});
+
+        assert_eq!(f(vis!{pub(in a::b)}),   vis!{pub(in a::b)});
+        assert_eq!(f(vis!{pub(in ::a::b)}), vis!{pub(in a::b)});
+
+        assert_eq!(f(vis!{}),           vis!{pub(super)});
+        assert_eq!(f(vis!{pub(crate)}), vis!{pub(crate)});
+        assert_eq!(f(vis!{pub}),        vis!{pub});
     }
 }
 
