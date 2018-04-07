@@ -7,5 +7,4 @@ authors = ["Michael Lamparski <diagonaldevice@gmail.com>"]
 path = "lib.rs"
 
 [dependencies]
-proc-macro-hack = "0.4"
 unbox-impl = { path = "impl" }

@@ -7,11 +7,3 @@ authors = ["Michael Lamparski <diagonaldevice@gmail.com>"]
 path = "lib.rs"
 crate-type = ["proc-macro"]
 
-[dependencies]
-strfmt = "0.1.6"
-proc-macro-hack = "0.4"
-proc-macro2 = "0.3.1"
-syn = { version = "0.13", features = ["full", "visit", "visit-mut", "fold"] }
-quote = "0.5.1"
-extension-trait = "0.1.2"
-enum-map = "0.2.24"
